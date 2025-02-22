@@ -27,7 +27,15 @@ SECRET_KEY = "django-insecure-+$vqjolcq#=s^*g$c@#t6#6f50li7t=uv2gr!%h84bpgb#5fik
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "wealthway.com",
+    "api.wealthway.com",
+    "localhost",
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://wealthway.com",
+]
 
 
 # Application definition
@@ -50,8 +58,17 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny'
     ),
 }
+
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'rest_framework.authentication.SessionAuthentication',  # Ensure this is correct
+#         'rest_framework.authentication.TokenAuthentication',
+#     ),
+# }
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

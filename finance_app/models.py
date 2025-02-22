@@ -8,10 +8,10 @@ import string
 def generateID():
     ID = ""
     for i in range(2):
-        ID += random.choice(string.ascii_uppercase)
+        ID += str(random.choice(string.ascii_uppercase))
 
     for _ in range(10):
-        ID += random.randint(0,9)
+        ID += str(random.randint(0,9))
     return ID
 
 class User(AbstractUser):
@@ -49,6 +49,8 @@ class User(AbstractUser):
     
     def save(self,*args,**kwargs):
         self.user_id = generateID()
+        self.first_name = self.first_name.upper()
+        self.last_name = self.last_name.upper()
         return super().save(*args,**kwargs)
 
 class Budget(models.Model):

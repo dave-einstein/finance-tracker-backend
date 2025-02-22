@@ -1,7 +1,7 @@
 from django.http import HttpResponse,JsonResponse
 from django.contrib.auth import get_user_model
 from rest_framework.parsers import JSONParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.views import APIView
 from rest_framework import status
@@ -16,7 +16,7 @@ import base64
 from datetime import datetime
 
 from .models import *
-from .serializer import *
+from .serializers import *
 
 User = get_user_model()
 
@@ -36,11 +36,11 @@ def generate_secret_hash(username, client_id, client_secret):
     return base64.b64encode(dig).decode("utf-8")
 
 class SignupView(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
-        name = request.date.get("first_name") + request.data.get("last_name")
+        name = request.data.get("first_name") + "" + request.data.get("last_name")
         username = request.data.get("username")
         email = request.data.get("email")
         password = request.data.get("password")
@@ -70,14 +70,14 @@ class SignupView(APIView):
             if serializer.is_valid():
                 serializer.save()
                 return JsonResponse(serializer.data, status=status.HTTP_201_CREATED)
-            return JsonResponse(serializer.errors, status=400)
+            return JsonResponse(serializer.errors, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         except Exception as e:
-            return JsonResponse({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return JsonResponse({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class ConfirmEmail(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
         username = request.data.get("username")
@@ -97,8 +97,8 @@ class ConfirmEmail(APIView):
             return JsonResponse(data=e.response["Error"]["Message"],status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class LoginView(APIView):
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
         email = request.data.get("email")
