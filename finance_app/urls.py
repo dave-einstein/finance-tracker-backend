@@ -9,7 +9,8 @@ urlpatterns = [
     path('api/login/',LoginView.as_view(),name="login"),
     path('api/confirm-email/',ConfirmEmail.as_view(),name="confirm-email"),
     path('api/logout/',SignoutView.as_view(),name="logout"),
-    path('api/budget/',BudgetView.as_view(),name="budget")
+    path('api/transaction/',TransactionView.as_view(),name="transaction"),
+    path('api/dashboard',DashboardView.as_view(),name="dashboard"),
     # path('api/forget-password/',ForgetPassword.as_view(),name="forget-password"),
     # path('api/reset-password/',ResetPassword.as_view(),name="reset-password"),
 ]

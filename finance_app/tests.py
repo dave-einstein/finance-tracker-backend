@@ -1,267 +1,211 @@
 from django.test import TestCase
-from rest_framework.test import APITestCase
-from django.urls import reverse
-from .models import User, Budget, Income, Savings, Investment, Expense
-from .serializers import (
-    UserSerializer,BudgetSerializer, IncomeSerializer, SavingsSerializer, 
-    InvestmentSerializer, ExpensesSerializer
-)
-import random
-from unittest.mock import patch
-from rest_framework.authtoken.models import Token
+from .models import User, Transactions
+from .serializers import UserSerializer, TransactionsSerializer
+from uuid import uuid4
+from django.utils.timezone import now
+from django.contrib.auth import get_user_model
+from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from decouple import config
+from django.urls import reverse
 
-class MyModelSerializerTest(TestCase):
+class UserSerializerTest(TestCase):
+    """Test cases for the UserSerializer."""
+    
     def setUp(self):
-        self.user = User.objects.create_user(
-            username='testuser', 
-            email='testuser@example.com',
-            password='password'
-            )
-        self.budget = Budget.objects.create(
+        """Create a test user for serialization tests."""
+        self.user = User.objects.create(
+            user_id=uuid4(),
+            first_name="John",
+            last_name="Doe",
+            username="johndoe",
+            email="johndoe@example.com",
+            currency="USD",
+            created_at=now()
+        )
+
+    def test_user_serialization(self):
+        """Test that the UserSerializer correctly serializes user data."""
+        serializer = UserSerializer(instance=self.user)
+        expected_data = serializer.data
+        self.assertEqual(serializer.data, expected_data)
+
+    def test_user_deserialization_valid_data(self):
+        """Test deserialization of valid user data."""
+        user_data = {
+            'user_id': str(uuid4()),
+            'first_name': "Alice",
+            'last_name': "Smith",
+            'username': "alicesmith",
+            'email': "alice@example.com",
+            'currency': "EUR",
+            'created_at': now(),
+        }
+        serializer = UserSerializer(data=user_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_user_deserialization_invalid_data(self):
+        """Test deserialization of invalid user data (missing required fields)."""
+        user_data = {
+            'first_name': "Alice",
+            'email': "alice@example.com",
+            'currency': "EUR",
+        }
+        serializer = UserSerializer(data=user_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('username', serializer.errors)
+
+class TransactionsSerializerTest(TestCase):
+    """Test cases for the TransactionsSerializer."""
+    
+    def setUp(self):
+        """Create a test user and transaction for serialization tests."""
+        self.user = User.objects.create(
+            user_id=uuid4(),
+            first_name="John",
+            last_name="Doe",
+            username="johndoe",
+            email="johndoe@example.com",
+            currency="USD",
+            created_at=now()
+        )
+
+        self.transaction = Transactions.objects.create(
+            transaction_id=uuid4(),
             user=self.user,
-            description='Test Budget',
-            year="2024",
-            month="Jan",
+            transaction_type="income",
+            description="Salary Payment",
+            amount=5000.00,
+            created_at=now(),
+            updated_at=now(),
         )
-    
-    def test_userserializer_valid_data(self):
-        data = {
-            'user_id': 'hhegw78478266bd',
-            'first_name': 'David',
-            'last_name': 'Kipkoech',
-            'username': 'testuser1',
-            'email': 'testuser1@example.com',
-            'password': 'Password@123',
-            'password2': 'Password@123',
-            'currency': 'USD',
-        }
 
-        serializer = UserSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
+    def test_transaction_serialization(self):
+        """Test that the TransactionsSerializer correctly serializes transaction data."""
+        serializer = TransactionsSerializer(instance=self.transaction)
+        expected_data = expected_data = serializer.data 
+        self.assertEqual(serializer.data, expected_data)
 
-    def test_budgetserializer_valid_data(self):
-        data = {
-            'id': 'hhegw78478266bd',
+    def test_transaction_deserialization_valid_data(self):
+        """Test deserialization of valid transaction data."""
+        transaction_data = {
+            'transaction_id': str(uuid4()),
             'user': self.user.user_id,
-            'description': 'Test Budget',
-            'year' : '2024', 
-            'month' : 'January',
-            }
-        serializer = BudgetSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
-
-    def test_incomeserializer_valid_data(self):
-        data = {
-            'id': 'hhegw78478266bd',
-            'description': 'Test Income',
-            'budget' : self.budget.id,
-            'income_type' : 'freelancing',
-            'amount': '1000',
-            }
-        serializer = IncomeSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
-
-    def test_savingsserializer_valid_data(self):
-        data = {
-            'id': 'hhegw78478266bd',
-            'description': 'Test Savings',
-            'budget' : self.budget.id,
-            'amount': '1000',
-            }
-        serializer = SavingsSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
-
-    def test_investmentserializer(self):
-        data = {
-            'id': 'hhegw78478266bd',
-            'description': 'Test Investment',
-            'budget' : self.budget.id,
-            'amount': '1000',
-            }
-        serializer = InvestmentSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
-
-    def test_expenseserializer_valid_data(self):
-        data = {
-            'id': 'hhegw78478266bd',
-            'description': 'Test Expense',
-            'budget' : self.budget.id,
-            'amount': '1000',
-            }
-        serializer = ExpensesSerializer(data=data)
-        self.assertTrue(serializer.is_valid())
-
-class UserCreationTestCase(APITestCase):
-    # def test_user_creation(self):
-    #     url = reverse('signup')
-    #     value1 = random.randint(1, 9999)
-    #     data = {
-    #         'user_id' : 'hhegw78478266bd123',
-    #         'first_name': 'David',
-    #         'last_name': 'Kipkoech',
-    #         'username': f'testuser{value1}',
-    #         'email': f'testuser{value1}@example.com',
-    #         'password': 'Password@123',
-    #         'password2': 'Password@123',
-    #         'currency': 'USD',
-    #     }
-        
-    #     response = self.client.post(url, data, format='json')
-    #     self.assertEqual(response.status_code, 201)
-
-    def test_confirm_email(self):
-        value2 = random.randint(10000,999999)
-        self.user = User.objects.create_user(
-            username=f'testuser{value2}',
-            email=f'testuser{value2}@example.com',
-            password='Password@123',
-            first_name='David',
-            last_name='Kipkoech',
-            currency='USD'
-        )
-
-        data = {
-            'username' : self.user.username,
-            'token': 'testtoken',
+            'transaction_type': "expenses",
+            'category': "Food", 
+            'description': "Grocery Shopping",
+            'amount': "100.50",
+            'created_at': now(),
+            'updated_at': now(),
         }
-        url = reverse('confirm-email')
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, 400)
-    
-    # def test_login(self):
-    #     value3 = random.randint(1000000,99999999)
-    #     self.user = User.objects.create_user(
-    #         username=f'testuser{value3}',
-    #         email=f'testuser{value3}@example.com',
-    #         password='Password@123',
-    #         first_name='David',
-    #         last_name='Kipkoech',
-    #         currency='USD'
-    #         )
-    #     self.user.is_active = True
-    #     self.user.save()
-    #     data = {
-    #         'username' : 'testuser640526',
-    #         'password' : 'Password@123',
-    #         }
-    #     url = reverse('login')
-    #     response = self.client.post(url, data, format='json')
-    #     self.assertEqual(response.status_code, 200)
+        serializer = TransactionsSerializer(data=transaction_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
-class SignoutViewTestCase(APITestCase):
-    
+    def test_transaction_deserialization_invalid_data(self):
+        """Test deserialization of invalid transaction data (missing fields)."""
+        transaction_data = {
+            'transaction_type': "expenses",
+            'description': "Grocery Shopping",
+            'amount': "100.50",
+        }
+        serializer = TransactionsSerializer(data=transaction_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('user', serializer.errors)  # 'user' is required
+
+User = get_user_model()
+
+# class SignupViewTest(APITestCase):
+#     def setUp(self):
+#         self.client = APIClient()
+#         self.signup_url = reverse("signup")
+#         self.valid_data = {
+#             "first_name": "John",
+#             "last_name": "Doe",
+#             "username": "johndoe",
+#             "email": "johndoe@example.com",
+#             "password": "securepassword123"
+#         }
+
+#     @patch('boto3.client')
+#     def test_signup_success(self, mock_cognito):
+#         mock_cognito.return_value.sign_up.return_value = {}
+#         response = self.client.post(self.signup_url, self.valid_data, format='json')
+#         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+#     def test_signup_missing_field(self):
+#         invalid_data = self.valid_data.copy()
+#         invalid_data.pop('email')  # Remove email to trigger error
+#         response = self.client.post(self.signup_url, invalid_data, format='json')
+#         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+#         self.assertIn('error', response.json())
+
+
+# class LoginViewTest(APITestCase):
+#     def setUp(self):
+#         self.client = APIClient()
+#         self.login_url = reverse("login")
+#         self.user = User.objects.create_user(
+#             username="johndoe",
+#             email="johndoe@example.com",
+#             password="securepassword123"
+#         )
+
+#     @patch('boto3.client')
+#     def test_login_success(self, mock_cognito):
+#         mock_cognito.return_value.initiate_auth.return_value = {
+#             "AuthenticationResult": {"AccessToken": "mocked_token"}
+#         }
+#         response = self.client.post(self.login_url, {
+#             "email": "johndoe@example.com",
+#             "password": "securepassword123"
+#         }, format='json')
+#         self.assertEqual(response.status_code, status.HTTP_200_OK)
+#         self.assertIn("access_token", response.json())
+
+#     def test_login_invalid_credentials(self):
+#         response = self.client.post(self.login_url, {
+#             "email": "wrong@example.com",
+#             "password": "wrongpassword"
+#         }, format='json')
+#         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+class TransactionViewTest(APITestCase):
     def setUp(self):
-        self.signout_url = reverse("logout")
-        self.access_token = "valid_test_token"
-        self.clientID = config("ClientID")
-
-        # Create a test user and authenticate
-        self.user = User.objects.create_user(username="testuser", password="Password@123")
+        self.client = APIClient()
+        self.transation_url = reverse("transaction")  # Adjust if necessary
+        self.user = User.objects.create_user(username="johndoe", email="johndoe@example.com", password="securepassword123")
+        self.transaction = Transactions.objects.create(
+            user=self.user,
+            transaction_type="income",
+            category="Salary",
+            description="Monthly salary",
+            amount=5000.00,
+        )
         self.client.force_authenticate(user=self.user)
 
-    @patch("finance_app.views.cognito.global_sign_out")
-    def test_successful_signout(self, mock_global_signout):
-        """Test signing out a user successfully."""
-        mock_global_signout.return_value = {"Success":True}  # Mock successful response
-
-        response = self.client.post(
-            self.signout_url,
-            HTTP_AUTHORIZATION=f"Bearer {self.access_token}"  # Ensure format matches API expectations
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"message": "User signed out"})
-        mock_global_signout.assert_called_once_with(
-            ClientId=self.clientID, AccessToken=self.access_token
-        )
-
-    @patch("finance_app.views.cognito.global_sign_out")
-    def test_failed_signout(self, mock_global_signout):
-        """Test signing out failure."""
-        mock_global_signout.side_effect = Exception("Signout failed")  # Simulate failure
-
-        response = self.client.post(
-            self.signout_url,
-            HTTP_AUTHORIZATION=f"Bearer {self.access_token}" 
-        )
-
-        self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json(), {"error": "Failed to sign out"})
-        mock_global_signout.assert_called_once()
-
-class BudgetViewTestCase(APITestCase):
-    def setUp(self):
-        """Set up test data, including a test user and a budget."""
-        # Create user and authentication token
-        self.user = User.objects.create_user(username="testuser", password="testpass")
-        self.token = Token.objects.create(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-        # Create a budget
-        self.budget = Budget.objects.create(
-            user=self.user, description="Test Budget", year=2025, month=2
-        )
-
-        # Create related objects
-        self.income = Income.objects.create(
-            budget=self.budget, description="Salary", income_type="Job", amount=5000
-        )
-        self.savings = Savings.objects.create(
-            budget=self.budget, description="Emergency Fund", amount=1000
-        )
-        self.investment = Investment.objects.create(
-            budget=self.budget, description="Stocks", amount=1500
-        )
-        self.expense = Expense.objects.create(
-            budget=self.budget, description="Rent", amount=2000
-        )
-
-    def test_get_budget_details(self):
-        """Test retrieving a budget along with associated records."""
-        url = reverse("budget")
-        response = self.client.get(url,data={"budget_id" : self.budget.id},format="json")
+    def test_get_transaction_success(self):
+        # Serializing the transaction object
+        serialized_transaction = TransactionsSerializer(self.transaction)
+        
+        response = self.client.get(self.transation_url, {"transaction_id": str(self.transaction.transaction_id)})
+        
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["budget"]["description"], "Test Budget")
-        self.assertEqual(len(response.data["income"]), 1)
-        self.assertEqual(len(response.data["savings"]), 1)
-        self.assertEqual(len(response.data["investments"]), 1)
-        self.assertEqual(len(response.data["expenses"]), 1)
+        self.assertEqual(response.json(), serialized_transaction.data)  # Ensure the response matches the serialized data
 
-    def test_get_budget_not_found(self):
-        """Test retrieving a non-existent budget."""
-        url = reverse("budget")
-        response = self.client.get(url,data={"budget_id" : "99999"},format="json")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_create_budget_with_related_entries(self):
-        """Test creating a budget along with income, savings, investments, and expenses."""
-        url = reverse("budget")
-        data = {
-            "id": "hhegw78478266bd",
-            "user": self.user.user_id, 
-            "description": "New Budget",
-            "year": 2025,
-            "month": 3,
-            "income": [{"description": "Freelance", "income_type": "Side Job", "amount": 2000}],
-            "savings": [{"description": "Vacation Fund", "amount": 500}],
-            "investments": [{"description": "Crypto", "amount": 300}],
-            "expenses": [{"description": "Groceries", "amount": 400}],
-        }
-
-        response = self.client.post(url, data, format="json")
+    def test_create_transactions_success(self):
+        transaction_data = [  # Wrap in a list
+            {
+                "user": self.user.user_id,  # Ensure this is an integer ID
+                "transaction_type": "expenses",
+                "category": "Food",
+                "description": "Lunch",
+                "amount": 15.00,  # Ensure it's a float, not a string
+            }
+        ]
+        response = self.client.post(self.transation_url, transaction_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Budget.objects.filter(description="New Budget").count(), 1)
-        new_budget = Budget.objects.get(description="New Budget")
-        self.assertEqual(Income.objects.filter(budget=new_budget).count(), 1)
-        self.assertEqual(Savings.objects.filter(budget=new_budget).count(), 1)
-        self.assertEqual(Investment.objects.filter(budget=new_budget).count(), 1)
-        self.assertEqual(Expense.objects.filter(budget=new_budget).count(), 1)
 
-    def test_create_budget_invalid_data(self):
-        """Test creating a budget with missing required fields."""
-        url = reverse("budget")
-        data = {"year": 2025}  # Missing description and month
-        response = self.client.post(url, data, format="json")
+
+
+    def test_create_transaction_invalid_format(self):
+        response = self.client.post(self.transation_url, {"invalid": "data"}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

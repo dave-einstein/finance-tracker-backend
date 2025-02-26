@@ -1,0 +1,5 @@
+Personal Finance Tracker
+1. [DONE] Backend - Django(Signup, Login, create and view transactions, dashboard)
+2. Frontend - Flutter
+3. Infrastructure- AWS
+4. ML Model

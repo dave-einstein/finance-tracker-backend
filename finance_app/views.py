@@ -15,11 +15,8 @@ import hashlib
 import base64
 from datetime import datetime
 from django.shortcuts import get_object_or_404
-from .models import Budget, Income, Savings, Investment, Expense
-from .serializers import (
-    UserSerializer,BudgetSerializer, IncomeSerializer, SavingsSerializer, 
-    InvestmentSerializer, ExpensesSerializer
-)
+from .models import User,Transactions
+from .serializers import UserSerializer,TransactionsSerializer
 
 
 User = get_user_model()
@@ -157,7 +154,7 @@ class SignoutView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-class BudgetView(APIView):
+class TransactionView(APIView):
     """
     Retrieve or update a budget, and handle creation of income, savings, investments, and expenses.
     """
@@ -166,62 +163,46 @@ class BudgetView(APIView):
 
     def get(self, request):
         """Retrieve a budget and associated records."""
-        budget_id = request.query_params.get("budget_id")
-        if not budget_id:
-            return Response({"error": "budget_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-        budget = get_object_or_404(Budget, id=budget_id)
-
-        # Fetch related objects
-        savings = Savings.objects.filter(budget=budget)
-        income = Income.objects.filter(budget=budget)
-        investments = Investment.objects.filter(budget=budget)
-        expenses = Expense.objects.filter(budget=budget)
-
-        return Response({
-            "budget": BudgetSerializer(budget).data,
-            "savings": SavingsSerializer(savings, many=True).data,
-            "income": IncomeSerializer(income, many=True).data,
-            "investments": InvestmentSerializer(investments, many=True).data,
-            "expenses": ExpensesSerializer(expenses, many=True).data,
-        }, status=status.HTTP_200_OK)
+        transaction_id = request.query_params.get("transaction_id")
+        try:
+            transaction = Transactions.objects.get(transaction_id=transaction_id)
+            serialized_transaction = TransactionsSerializer(transaction)
+            return Response(serialized_transaction.data, status=status.HTTP_200_OK)
+        except Transactions.DoesNotExist:
+            return Response({"error": "Transaction not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def post(self, request):
-        """Create a budget along with associated income, savings, investments, and expenses."""
-        # Validate and create budget
-        budget_serializer = BudgetSerializer(data=request.data)
-        if not budget_serializer.is_valid():
-            return Response(budget_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        """Create multiple transactions at once."""
+        if not isinstance(request.data, list):
+            return Response({"error": "Expected a list of transactions"}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction_serializer = TransactionsSerializer(data=request.data, many=True)
         
-        budget = budget_serializer.save(user=request.user)
+        if not transaction_serializer.is_valid():
+            return Response(transaction_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Bulk create related records
-        def bulk_create_related(serializer_class, data, budget):
-            """Helper function to serialize and bulk create related records."""
-            for item in data:
-                item["budget"] = budget.id  # Assign budget to each entry
-            serializer = serializer_class(data=data, many=True)
-            if serializer.is_valid():
-                serializer.save()
-            else:
-                return serializer.errors  # Collect errors if any
-            return None
+        transactions = transaction_serializer.save()
+        return Response(TransactionsSerializer(transactions, many=True).data, status=status.HTTP_201_CREATED)
 
-        errors = {}
-        related_data = {
-            "income": (IncomeSerializer, request.data.get("income", [])),
-            "savings": (SavingsSerializer, request.data.get("savings", [])),
-            "investments": (InvestmentSerializer, request.data.get("investments", [])),
-            "expenses": (ExpensesSerializer, request.data.get("expenses", [])),
-        }
+class DashboardView(APIView):
+    """
+    Retrieve a user's dashboard.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
 
-        for key, (serializer_class, data) in related_data.items():
-            if data:
-                error = bulk_create_related(serializer_class, data, budget)
-                if error:
-                    errors[key] = error
+    def get(self,request):
+        """Retrieve a user's dashboard."""
+        try:
 
-        if errors:
-            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(BudgetSerializer(budget).data, status=status.HTTP_201_CREATED)
+            user = request.user
+            user_info = get_object_or_404(User, user_id=user.user_id)
+            transactions = Transactions.objects.filter(user= user)
+        
+            return Response({
+                "user" : user_info,
+                "transactions" : TransactionsSerializer(transactions, many=True).data
+                }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
